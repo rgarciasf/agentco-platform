@@ -1,1 +1,28 @@
-* { box-sizing: border-box; margin: 0; padding: 0; }
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+  --bg: #0e0f11;
+  --sb: #13151a;
+  --sur: #1a1d24;
+  --sur2: #22262f;
+  --bdr: #2a2d35;
+  --bdr2: #353840;
+  --t1: #e8eaf0;
+  --t2: #9ca3b0;
+  --t3: #5a6070;
+  --acc: #4f8ef7;
+  --acc-d: #1a2d52;
+  --acc-t: #93bbff;
+  --grn: #34d399;
+  --grn-d: #0d2d20;
+  --grn-t: #6ee7b7;
+  --amb: #f59e0b;
+  --amb-d: #2d1f08;
+  --amb-t: #fcd34d;
+  --red: #f87171;
+  --red-d: #2d1010;
+  --mono: 'DM Mono', monospace;
+  --serif: 'Fraunces', serif;
+}
+
+html, body { height: 100%; background: var(--bg); }
