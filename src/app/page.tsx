@@ -6,6 +6,7 @@ import { Sidebar } from '@/components/Sidebar'
 import { DiscoverView } from '@/components/DiscoverView'
 import { PipelineView } from '@/components/PipelineView'
 import { DivisionView } from '@/components/DivisionView'
+import { CodeGenView } from '@/components/CodeGenView'
 import styles from './page.module.css'
 
 export type BuildState = 'idle' | 'running' | 'complete'
@@ -159,13 +160,22 @@ export default function Platform() {
             <DiscoverView onBuild={runBuild} />
           )}
           {view === 'pipeline' && (
-            <PipelineView
-              buildState={buildState}
-              statuses={statuses}
-              log={log}
-              product={product}
-              onNav={handleNav}
-            />
+            <div style={{ flex: 1, overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
+              <div style={{ flex: 1, overflow: 'hidden' }}>
+                <PipelineView
+                  buildState={buildState}
+                  statuses={statuses}
+                  log={log}
+                  product={product}
+                  onNav={handleNav}
+                />
+              </div>
+              {buildState === 'complete' && (
+                <div style={{ flexShrink: 0, padding: '0 12px 12px', overflowY: 'auto', maxHeight: 340 }}>
+                  <CodeGenView prompt={product} agentOutputs={outputs} />
+                </div>
+              )}
+            </div>
           )}
           {DIVISIONS.some(d => d.id === view) && (
             <DivisionView
