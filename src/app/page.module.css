@@ -6,7 +6,6 @@
   color: var(--t1);
   font-family: var(--mono);
 }
-
 .titlebar {
   height: 38px;
   background: var(--sb);
@@ -18,34 +17,14 @@
   flex-shrink: 0;
   user-select: none;
 }
-
 .traffic { display: flex; gap: 6px; align-items: center; }
 .traffic span { width: 12px; height: 12px; border-radius: 50%; display: block; }
 .red { background: #ff5f57; }
 .yellow { background: #ffbd2e; }
 .green { background: #28c840; }
-
-.tbTitle {
-  font-size: 11px;
-  color: var(--t3);
-  margin: 0 auto;
-  letter-spacing: .5px;
-}
-
-.body {
-  flex: 1;
-  display: flex;
-  overflow: hidden;
-}
-
-.main {
-  flex: 1;
-  overflow: hidden;
-  display: flex;
-  flex-direction: column;
-  background: var(--bg);
-}
-
+.tbTitle { font-size: 11px; color: var(--t3); margin: 0 auto; letter-spacing: .5px; }
+.body { flex: 1; display: flex; overflow: hidden; }
+.main { flex: 1; overflow: hidden; display: flex; flex-direction: column; background: var(--bg); }
 .pbar {
   flex-shrink: 0;
   border-top: 1px solid var(--bdr);
@@ -55,37 +34,25 @@
   align-items: center;
   gap: 8px;
 }
-
 .pInput {
-  flex: 1;
-  font-size: 12px;
-  padding: 7px 12px;
-  background: var(--sur);
-  border: 1px solid var(--bdr);
-  border-radius: 7px;
-  color: var(--t1);
-  outline: none;
-  font-family: var(--mono);
+  flex: 1; font-size: 12px; padding: 7px 12px;
+  background: var(--sur); border: 1px solid var(--bdr);
+  border-radius: 7px; color: var(--t1); outline: none; font-family: var(--mono);
 }
 .pInput:focus { border-color: var(--bdr2); }
 .pInput::placeholder { color: var(--t3); }
 .pInput:disabled { opacity: .5; }
-
 .btn {
-  font-size: 12px;
-  padding: 7px 14px;
-  border-radius: 7px;
-  border: 1px solid var(--bdr2);
-  background: transparent;
-  color: var(--t2);
-  cursor: pointer;
-  font-family: var(--mono);
-  transition: all .15s;
-  flex-shrink: 0;
+  font-size: 12px; padding: 7px 14px; border-radius: 7px;
+  border: 1px solid var(--bdr2); background: transparent; color: var(--t2);
+  cursor: pointer; font-family: var(--mono); transition: all .15s; flex-shrink: 0;
+  white-space: nowrap;
 }
 .btn:hover:not(:disabled) { background: var(--sur); color: var(--t1); }
 .btn:disabled { opacity: .3; cursor: default; }
 .btnPrimary { background: var(--acc-d); border-color: var(--acc); color: var(--acc-t); }
 .btnPrimary:hover:not(:disabled) { background: #1f3566; }
+.btnGreen { background: var(--grn-d); border-color: var(--grn); color: var(--grn-t); }
+.btnGreen:hover:not(:disabled) { background: #0f3d25; }
 .btnDanger { border-color: #553333; color: var(--red); }
 .btnDanger:hover:not(:disabled) { background: var(--red-d); }

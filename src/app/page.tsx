@@ -1,17 +1,17 @@
 'use client'
 
-import { useState, useRef, useCallback } from 'react'
+import { useState, useRef, useCallback, useEffect } from 'react'
 import { DIVISIONS } from '@/lib/divisions'
 import { Sidebar } from '@/components/Sidebar'
 import { DiscoverView } from '@/components/DiscoverView'
 import { PipelineView } from '@/components/PipelineView'
 import { DivisionView } from '@/components/DivisionView'
-import { CodeGenView } from '@/components/CodeGenView'
+import { CodeWorkspace } from '@/components/CodeWorkspace'
 import styles from './page.module.css'
 
 export type BuildState = 'idle' | 'running' | 'complete'
 export type DivisionStatus = 'idle' | 'active' | 'done' | 'error'
-export type View = 'discover' | 'pipeline' | string // string = division id
+export type View = 'discover' | 'pipeline' | 'codegen' | string
 
 export interface LogEntry {
   id: string
@@ -19,6 +19,11 @@ export interface LogEntry {
   text: string
   type: 'sys' | 'div' | 'out' | 'done' | 'err' | 'streaming'
   divId?: string
+}
+
+// Cache key for localStorage
+function cacheKey(prompt: string) {
+  return `agentco_research_${btoa(prompt).slice(0, 32)}`
 }
 
 const ts = () => new Date().toLocaleTimeString('en-US', { hour12: false })
@@ -31,7 +36,28 @@ export default function Platform() {
   const [log, setLog] = useState<LogEntry[]>([])
   const [outputs, setOutputs] = useState<Record<string, string>>({})
   const [product, setProduct] = useState('')
+  const [isCached, setIsCached] = useState(false)
   const abortRef = useRef(false)
+
+  // Load cached research on mount
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+    const stored = localStorage.getItem('agentco_last_prompt')
+    if (stored) {
+      const cached = localStorage.getItem(cacheKey(stored))
+      if (cached) {
+        try {
+          const data = JSON.parse(cached) as { outputs: Record<string, string>; product: string }
+          setOutputs(data.outputs)
+          setProduct(data.product)
+          setPrompt(data.product)
+          setIsCached(true)
+          setBuildState('complete')
+          setStatuses(Object.fromEntries(DIVISIONS.map(d => [d.id, 'done'])))
+        } catch {}
+      }
+    }
+  }, [])
 
   const addLog = useCallback((text: string, type: LogEntry['type'], divId?: string) => {
     setLog(prev => [...prev, { id: `${Date.now()}-${Math.random()}`, ts: ts(), text, type, divId }])
@@ -39,6 +65,24 @@ export default function Platform() {
 
   const runBuild = useCallback(async (promptText: string) => {
     if (!promptText.trim() || buildState === 'running') return
+
+    // Check cache first — skip research if we have fresh results
+    const key = cacheKey(promptText)
+    const cached = typeof window !== 'undefined' ? localStorage.getItem(key) : null
+    if (cached) {
+      try {
+        const data = JSON.parse(cached) as { outputs: Record<string, string>; product: string }
+        setOutputs(data.outputs)
+        setProduct(promptText)
+        setIsCached(true)
+        setBuildState('complete')
+        setStatuses(Object.fromEntries(DIVISIONS.map(d => [d.id, 'done'])))
+        setView('pipeline')
+        return
+      } catch {}
+    }
+
+    // Fresh research run
     abortRef.current = false
     setBuildState('running')
     setView('pipeline')
@@ -46,6 +90,7 @@ export default function Platform() {
     setLog([])
     setOutputs({})
     setProduct(promptText)
+    setIsCached(false)
 
     addLog(`CEO → "${promptText}"`, 'sys')
     await delay(300)
@@ -55,6 +100,7 @@ export default function Platform() {
     await delay(500)
 
     let prevOutput = ''
+    const collectedOutputs: Record<string, string> = {}
 
     for (const division of DIVISIONS) {
       if (abortRef.current) break
@@ -88,9 +134,9 @@ export default function Platform() {
           setOutputs(prev => ({ ...prev, [division.id]: full }))
         }
 
-        // Finalise log entry
         const summary = full.split('\n').filter(l => l.trim()).slice(0, 2).join(' · ').slice(0, 200)
         setLog(prev => prev.map(e => e.id === thinkId ? { ...e, text: summary, type: 'out' } : e))
+        collectedOutputs[division.id] = full
         setOutputs(prev => ({ ...prev, [division.id]: full }))
         prevOutput = full.slice(0, 800)
         setStatuses(prev => ({ ...prev, [division.id]: 'done' }))
@@ -106,11 +152,30 @@ export default function Platform() {
       }
     }
 
+    // Cache the research results
+    if (!abortRef.current && typeof window !== 'undefined') {
+      const cacheData = { outputs: collectedOutputs, product: promptText, cachedAt: Date.now() }
+      localStorage.setItem(key, JSON.stringify(cacheData))
+      localStorage.setItem('agentco_last_prompt', promptText)
+    }
+
     setBuildState('complete')
     if (!abortRef.current) {
-      addLog(`${promptText} — all 7 divisions complete`, 'done')
+      addLog(`Research complete — ${DIVISIONS.length} divisions · results cached`, 'done')
     }
   }, [buildState, addLog])
+
+  const clearCache = useCallback(() => {
+    if (typeof window === 'undefined') return
+    const key = cacheKey(prompt)
+    localStorage.removeItem(key)
+    localStorage.removeItem('agentco_last_prompt')
+    setIsCached(false)
+    setBuildState('idle')
+    setStatuses({})
+    setLog([])
+    setOutputs({})
+  }, [prompt])
 
   const cancel = useCallback(() => {
     abortRef.current = true
@@ -118,25 +183,15 @@ export default function Platform() {
     addLog('Build cancelled', 'err')
   }, [addLog])
 
-  const reset = useCallback(() => {
-    abortRef.current = true
-    setBuildState('idle')
-    setView('discover')
-    setStatuses({})
-    setLog([])
-    setOutputs({})
-    setProduct('')
-    setPrompt('')
-  }, [])
-
   const handleNav = (id: View) => {
-    if (id === 'pipeline' && buildState === 'idle') return
+    if (id === 'pipeline' && buildState === 'idle' && !isCached) return
     setView(id)
   }
 
+  const hasResearch = buildState === 'complete' || isCached
+
   return (
     <div className={styles.root}>
-      {/* Titlebar */}
       <div className={styles.titlebar}>
         <div className={styles.traffic}>
           <span className={styles.red} />
@@ -144,56 +199,59 @@ export default function Platform() {
           <span className={styles.green} />
         </div>
         <div className={styles.tbTitle}>AgentCo Platform — agent-native software company</div>
+        {isCached && (
+          <div style={{ fontSize: 10, color: '#6ee7b7', background: '#0d2d20', padding: '2px 8px', borderRadius: 4, border: '1px solid #34d399', marginLeft: 8 }}>
+            ✓ Research cached
+          </div>
+        )}
       </div>
 
-      {/* Body */}
       <div className={styles.body}>
         <Sidebar
           view={view}
           buildState={buildState}
           statuses={statuses}
+          hasResearch={hasResearch}
           onNav={handleNav}
         />
 
         <main className={styles.main}>
-          {view === 'discover' && (
-            <DiscoverView onBuild={runBuild} />
-          )}
+          {view === 'discover' && <DiscoverView onBuild={runBuild} cachedPrompt={isCached ? prompt : undefined} />}
+
           {view === 'pipeline' && (
-            <div style={{ flex: 1, overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
-              <div style={{ flex: 1, overflow: 'hidden' }}>
-                <PipelineView
-                  buildState={buildState}
-                  statuses={statuses}
-                  log={log}
-                  product={product}
-                  onNav={handleNav}
-                />
-              </div>
-              {buildState === 'complete' && (
-                <div style={{ flexShrink: 0, padding: '0 12px 12px', overflowY: 'auto', maxHeight: 340 }}>
-                  <CodeGenView prompt={product} agentOutputs={outputs} />
-                </div>
-              )}
-            </div>
-          )}
-          {DIVISIONS.some(d => d.id === view) && (
-            <DivisionView
-              divisionId={view}
+            <PipelineView
+              buildState={buildState}
               statuses={statuses}
-              outputs={outputs}
+              log={log}
+              product={product}
+              isCached={isCached}
+              onNav={handleNav}
+              onClearCache={clearCache}
             />
+          )}
+
+          {view === 'codegen' && (
+            <CodeWorkspace
+              prompt={product}
+              agentOutputs={outputs}
+              onBack={() => setView('pipeline')}
+            />
+          )}
+
+          {DIVISIONS.some(d => d.id === view) && (
+            <DivisionView divisionId={view} statuses={statuses} outputs={outputs} />
           )}
         </main>
       </div>
 
-      {/* Prompt bar */}
       <div className={styles.pbar}>
-        {buildState === 'complete' && (
-          <button className={`${styles.btn} ${styles.btnDanger}`} onClick={reset}>Reset</button>
-        )}
         {buildState === 'running' && (
-          <button className={styles.btn} onClick={cancel}>Stop</button>
+          <button className={`${styles.btn} ${styles.btnDanger}`} onClick={cancel}>Stop</button>
+        )}
+        {isCached && (
+          <button className={styles.btn} onClick={clearCache} title="Clear cached research and re-run">
+            ↺ Re-research
+          </button>
         )}
         <input
           className={styles.pInput}
@@ -203,13 +261,22 @@ export default function Platform() {
           placeholder='e.g. "Build a Zoom competitor for LATAM"'
           disabled={buildState === 'running'}
         />
-        <button
-          className={`${styles.btn} ${styles.btnPrimary}`}
-          onClick={() => runBuild(prompt)}
-          disabled={buildState === 'running' || !prompt.trim()}
-        >
-          {buildState === 'running' ? '⏳ Building…' : 'Build ↗'}
-        </button>
+        {hasResearch ? (
+          <button
+            className={`${styles.btn} ${styles.btnGreen}`}
+            onClick={() => setView('codegen')}
+          >
+            ⚡ Generate Code →
+          </button>
+        ) : (
+          <button
+            className={`${styles.btn} ${styles.btnPrimary}`}
+            onClick={() => runBuild(prompt)}
+            disabled={buildState === 'running' || !prompt.trim()}
+          >
+            {buildState === 'running' ? '⏳ Researching…' : 'Research ↗'}
+          </button>
+        )}
       </div>
     </div>
   )
